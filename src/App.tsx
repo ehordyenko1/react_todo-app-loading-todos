@@ -4,6 +4,15 @@ import { USER_ID } from './api/todos';
 import { Todo } from './types/Todo';
 import { client } from './utils/fetchClient';
 
+enum Error {
+  NONE = '',
+  LOAD_TODOS = 'Unable to load todos',
+  EMPTY_TITLE = 'Title should not be empty',
+  ADD_TODO = 'Unable to add a todo',
+  DELETE_TODO = 'Unable to delete a todo',
+  UPDATE_TODO = 'Unable to update a todo',
+}
+
 export const App: React.FC = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [isLoading, setLoading] = useState(false);
@@ -11,9 +20,19 @@ export const App: React.FC = () => {
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
   const [title, setTitle] = useState<string>('');
   const [titleError, setTitleError] = useState<boolean>(false);
-  const [errorType, setErrorType] = useState<
-    null | 'load' | 'emptyTitle' | 'add' | 'delete' | 'update'
-  >(null);
+  const [errorType, setErrorType] = useState<Error>(Error.NONE);
+
+  useEffect(() => {
+    if (errorType !== Error.NONE) {
+      const timer = setTimeout(() => {
+        setErrorType(Error.NONE);
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+
+    return undefined;
+  }, [errorType]);
 
   const filteredTodos = todos.filter(todo => {
     if (filter === 'active') {
@@ -41,13 +60,10 @@ export const App: React.FC = () => {
         completed: !todo.completed,
       });
 
-      setTodos(prevTodos =>
-        prevTodos.map(t => (t.id === todo.id ? updatedTodo : t)),
-      );
-
-      setErrorType(null);
+      setTodos(prev => prev.map(t => (t.id === todo.id ? updatedTodo : t)));
+      setErrorType(Error.NONE);
     } catch {
-      setErrorType('update');
+      setErrorType(Error.UPDATE_TODO);
     } finally {
       setLoadingTodoId(null);
     }
@@ -61,11 +77,11 @@ export const App: React.FC = () => {
     client
       .delete(`/todos/${id}`)
       .then(() => {
-        setTodos(prevTodos => prevTodos.filter(todo => todo.id !== id));
-        setErrorType(null);
+        setTodos(prev => prev.filter(todo => todo.id !== id));
+        setErrorType(Error.NONE);
       })
       .catch(() => {
-        setErrorType('delete');
+        setErrorType(Error.DELETE_TODO);
       });
   };
 
@@ -74,11 +90,11 @@ export const App: React.FC = () => {
 
     Promise.all(completedTodos.map(todo => client.delete(`/todos/${todo.id}`)))
       .then(() => {
-        setTodos(prevTodos => prevTodos.filter(todo => !todo.completed));
-        setErrorType(null);
+        setTodos(prev => prev.filter(todo => !todo.completed));
+        setErrorType(Error.NONE);
       })
       .catch(() => {
-        setErrorType('delete');
+        setErrorType(Error.DELETE_TODO);
       });
   };
 
@@ -87,26 +103,28 @@ export const App: React.FC = () => {
 
     if (!title.trim()) {
       setTitleError(true);
-      setErrorType('emptyTitle');
+      setErrorType(Error.EMPTY_TITLE);
 
       return;
     }
 
+    const newTodo = {
+      userId: USER_ID,
+      title: title.trim(),
+      completed: false,
+    };
+
     client
-      .post<Todo>('/todos', {
-        userId: USER_ID,
-        title: title.trim(),
-        completed: false,
+      .post<Todo>('/todos', newTodo)
+      .then(addedTodo => {
+        setTodos(prev => [...prev, addedTodo]);
+        setTitle('');
+        setTitleError(false);
+        setErrorType(Error.NONE);
       })
-    .then(newTodo => {
-      setTodos(prev => [...prev, newTodo]);
-      setTitle('');
-      setTitleError(false);
-      setErrorType(null);
-    })
-    .catch(() => {
-      setErrorType('add');
-    });
+      .catch(() => {
+        setErrorType(Error.ADD_TODO);
+      });
   };
 
   useEffect(() => {
@@ -114,12 +132,12 @@ export const App: React.FC = () => {
 
     client
       .get<Todo[]>(`/todos?userId=${USER_ID}`)
-      .then(fetchedTodos => {
-        setTodos(fetchedTodos);
+      .then(data => {
+        setTodos(data);
         setLoading(false);
       })
       .catch(() => {
-        setErrorType('load');
+        setErrorType(Error.LOAD_TODOS);
         setLoading(false);
       });
   }, []);
@@ -158,10 +176,10 @@ export const App: React.FC = () => {
               )
                 .then(updatedTodos => {
                   setTodos(updatedTodos);
-                  setErrorType(null);
+                  setErrorType(Error.NONE);
                 })
                 .catch(() => {
-                  setErrorType('update');
+                  setErrorType(Error.UPDATE_TODO);
                 });
             }}
           />
@@ -174,13 +192,11 @@ export const App: React.FC = () => {
               placeholder="What needs to be done?"
               className={`todoapp__new-todo ${titleError ? 'error' : ''}`}
               onChange={e => {
-                setTitle(e.target.value);
+                handleChange(e);
                 if (titleError && e.target.value.trim()) {
                   setTitleError(false);
-                  setErrorType(null);
+                  setErrorType(Error.NONE);
                 }
-
-                handleChange(e);
               }}
               aria-invalid={titleError}
               aria-describedby={titleError ? 'title-error' : undefined}
@@ -189,43 +205,43 @@ export const App: React.FC = () => {
         </header>
 
         <section className="todoapp__main" data-cy="TodoList">
-          {todos.length === 0
-            ? null
-            : filteredTodos.map(todo => (
-                <div
-                  key={todo.id}
-                  className={`todo ${todo.completed ? 'completed' : ''}`}
+          {todos.length > 0 &&
+            filteredTodos.map(todo => (
+              <div
+                key={todo.id}
+                className={`todo ${todo.completed ? 'completed' : ''}`}
+              >
+                <label
+                  className="todo__status-label"
+                  htmlFor={`todo-checkbox-${todo.id}`}
                 >
-                  <label
-                    className="todo__status-label"
-                    htmlFor={`todo-checkbox-${todo.id}`}
-                  >
-                    <input
-                      id={`todo-checkbox-${todo.id}`}
-                      data-cy="TodoStatus"
-                      type="checkbox"
-                      className="todo__status active"
-                      checked={todo.completed}
-                      disabled={loadingTodoId === todo.id}
-                      onChange={() => handleToggle(todo)}
-                    />
-                  </label>
+                  <input
+                    id={`todo-checkbox-${todo.id}`}
+                    data-cy="TodoStatus"
+                    type="checkbox"
+                    className="todo__status active"
+                    checked={todo.completed}
+                    disabled={loadingTodoId === todo.id}
+                    onChange={() => handleToggle(todo)}
+                    aria-label={`Mark todo "${todo.title}" as completed`}
+                  />
+                </label>
 
-                  <span data-cy="TodoTitle" className="todo__title">
-                    {todo.title}
-                  </span>
+                <span data-cy="TodoTitle" className="todo__title">
+                  {todo.title}
+                </span>
 
-                  <button
-                    type="button"
-                    className="todo__remove"
-                    data-cy="TodoDelete"
-                    aria-label={`Delete todo: ${todo.title}`}
-                    onClick={() => handleDelete(todo.id)}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
+                <button
+                  type="button"
+                  className="todo__remove"
+                  data-cy="TodoDelete"
+                  aria-label={`Delete todo: ${todo.title}`}
+                  onClick={() => handleDelete(todo.id)}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
         </section>
 
         {todos.length > 0 && (
@@ -249,9 +265,7 @@ export const App: React.FC = () => {
 
               <a
                 href="#/active"
-                className={`filter__link ${
-                  filter === 'active' ? 'selected' : ''
-                }`}
+                className={`filter__link ${filter === 'active' ? 'selected' : ''}`}
                 data-cy="FilterLinkActive"
                 onClick={e => {
                   e.preventDefault();
@@ -263,9 +277,7 @@ export const App: React.FC = () => {
 
               <a
                 href="#/completed"
-                className={`filter__link ${
-                  filter === 'completed' ? 'selected' : ''
-                }`}
+                className={`filter__link ${filter === 'completed' ? 'selected' : ''}`}
                 data-cy="FilterLinkCompleted"
                 onClick={e => {
                   e.preventDefault();
@@ -293,26 +305,21 @@ export const App: React.FC = () => {
       <div
         data-cy="ErrorNotification"
         className={`notification is-danger is-light has-text-weight-normal ${
-          errorType ? '' : 'hidden'
+          errorType !== Error.NONE ? '' : 'hidden'
         }`}
         role="alert"
         aria-live="assertive"
       >
-        {errorType && (
+        {errorType !== Error.NONE && (
           <>
             <button
               data-cy="HideErrorButton"
               type="button"
               className="delete"
               aria-label="Close error notification"
-              onClick={() => setErrorType(null)}
+              onClick={() => setErrorType(Error.NONE)}
             />
-
-            {errorType === 'load' && <>Unable to load todos</>}
-            {errorType === 'emptyTitle' && <>Title should not be empty</>}
-            {errorType === 'add' && <>Unable to add a todo</>}
-            {errorType === 'delete' && <>Unable to delete a todo</>}
-            {errorType === 'update' && <>Unable to update a todo</>}
+            {errorType}
           </>
         )}
       </div>
