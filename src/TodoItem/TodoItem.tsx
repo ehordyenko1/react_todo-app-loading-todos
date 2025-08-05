@@ -14,7 +14,7 @@ export const TodoItem: React.FC<Props> = ({
   handleToggle,
   handleDelete,
 }) => (
-  <div className={`todo ${todo.completed ? 'completed' : ''}`}>
+  <div data-cy="Todo" className={`todo ${todo.completed ? 'completed' : ''}`}>
     <label className="todo__status-label" htmlFor={`todo-checkbox-${todo.id}`}>
       <input
         id={`todo-checkbox-${todo.id}`}
