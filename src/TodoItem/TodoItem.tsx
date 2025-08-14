@@ -15,6 +15,12 @@ export const TodoItem: React.FC<Props> = ({
   handleDelete,
 }) => (
   <div data-cy="Todo" className={`todo ${todo.completed ? 'completed' : ''}`}>
+    {loadingTodoId === todo.id && (
+      <div data-cy="TodoLoader" className="modal overlay is-active">
+        <div className="modal-background has-background-white-ter" />
+        <div className="loader" />
+      </div>
+    )}
     <label className="todo__status-label" htmlFor={`todo-checkbox-${todo.id}`}>
       <input
         id={`todo-checkbox-${todo.id}`}

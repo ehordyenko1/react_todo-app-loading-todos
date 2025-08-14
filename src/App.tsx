@@ -141,7 +141,14 @@ export const App: React.FC = () => {
   }
 
   if (isLoading) {
-    return <div>Loading todos...</div>;
+    return (
+      <div className="todoapp">
+        <div className="modal overlay is-active">
+          <div className="modal-background has-background-white-ter" />
+          <div className="loader" />
+        </div>
+      </div>
+    );
   }
 
   return (
