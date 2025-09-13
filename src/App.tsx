@@ -145,7 +145,7 @@ export const App: React.FC = () => {
       <div className="todoapp">
         <div className="modal overlay is-active">
           <div className="modal-background has-background-white-ter" />
-          <div className="loader" />
+          <div className="loader" data-cy="TodoLoader" />
         </div>
       </div>
     );
